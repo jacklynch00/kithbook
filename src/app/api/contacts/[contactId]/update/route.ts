@@ -10,7 +10,7 @@ const UpdateContactSchema = z.object({
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { contactId: string } }
+  { params }: { params: Promise<{ contactId: string }> }
 ) {
   try {
     const session = await auth.api.getSession({ headers: request.headers });
@@ -19,7 +19,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const contactId = params.contactId;
+    const { contactId } = await params;
     const body = await request.json();
     
     // Validate request body
