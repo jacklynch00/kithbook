@@ -36,6 +36,8 @@ export function useSync() {
     onSuccess: () => {
       // Invalidate and refetch contacts after successful sync
       queryClient.invalidateQueries({ queryKey: contactsKeys.all });
+      // Also invalidate network graph data since it depends on contacts
+      queryClient.invalidateQueries({ queryKey: ['networkGraph'] });
     },
     onError: (error) => {
       console.error('Sync failed:', error);
