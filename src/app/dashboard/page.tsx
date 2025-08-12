@@ -42,9 +42,9 @@ export default function Dashboard() {
 	const handleStartEdit = (contact: ContactType, event: React.MouseEvent) => {
 		event.stopPropagation(); // Prevent opening timeline
 		setEditingContact(contact.id);
-		setEditForm({ 
-			name: contact.name || '', 
-			email: contact.email 
+		setEditForm({
+			name: contact.name || '',
+			email: contact.email,
 		});
 	};
 
@@ -56,17 +56,20 @@ export default function Dashboard() {
 
 	const handleSaveEdit = (contactId: string, event: React.MouseEvent) => {
 		event.stopPropagation();
-		
+
 		const updates: { name?: string; email?: string } = {};
 		if (editForm.name.trim()) updates.name = editForm.name.trim();
 		if (editForm.email.trim()) updates.email = editForm.email.trim();
 
-		updateContact({ contactId, updates }, {
-			onSuccess: () => {
-				setEditingContact(null);
-				setEditForm({ name: '', email: '' });
+		updateContact(
+			{ contactId, updates },
+			{
+				onSuccess: () => {
+					setEditingContact(null);
+					setEditForm({ name: '', email: '' });
+				},
 			}
-		});
+		);
 	};
 
 	// Filter contacts based on search term
@@ -118,11 +121,6 @@ export default function Dashboard() {
 
 			<div className='container mx-auto px-4 py-8'>
 				<div className='max-w-4xl mx-auto space-y-8'>
-					<div className='text-center'>
-						<h2 className='text-3xl font-bold mb-4'>Welcome to your Dashboard</h2>
-						<p className='text-lg text-muted-foreground'>Track your contacts and manage your relationships</p>
-					</div>
-
 					<div className='space-y-6'>
 						{/* Sync Section */}
 						<div className='text-center'>
@@ -140,17 +138,17 @@ export default function Dashboard() {
 									View Full Screen
 								</Link>
 							</div>
-							
+
 							<div className='border rounded-lg bg-background' style={{ height: '400px' }}>
 								<NetworkGraph data={networkData} isLoading={loadingNetwork} compact={true} />
 							</div>
-							
+
 							{networkData && (
 								<div className='flex flex-col sm:flex-row justify-between items-center gap-4'>
 									<div className='text-center sm:text-left text-sm text-muted-foreground'>
 										Showing {networkData.nodes.length} contacts with {networkData.edges.length} connections
 									</div>
-									
+
 									{/* Legend */}
 									<div className='flex flex-wrap items-center gap-4 text-xs text-muted-foreground'>
 										<div className='flex items-center gap-1'>
@@ -200,7 +198,10 @@ export default function Dashboard() {
 								) : filteredContacts.length > 0 ? (
 									<div className='divide-y'>
 										{filteredContacts.map((contact) => (
-											<div key={contact.id} className='p-4 hover:bg-muted/30 transition-colors' onClick={() => editingContact !== contact.id ? setSelectedContact(contact) : undefined}>
+											<div
+												key={contact.id}
+												className='p-4 hover:bg-muted/30 transition-colors'
+												onClick={() => (editingContact !== contact.id ? setSelectedContact(contact) : undefined)}>
 												<div className='flex justify-between items-start'>
 													<div className='space-y-1 flex-1'>
 														{editingContact === contact.id ? (
@@ -208,13 +209,13 @@ export default function Dashboard() {
 															<div className='space-y-2' onClick={(e) => e.stopPropagation()}>
 																<Input
 																	value={editForm.name}
-																	onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+																	onChange={(e) => setEditForm((prev) => ({ ...prev, name: e.target.value }))}
 																	placeholder='Contact name'
 																	className='text-sm'
 																/>
 																<Input
 																	value={editForm.email}
-																	onChange={(e) => setEditForm(prev => ({ ...prev, email: e.target.value }))}
+																	onChange={(e) => setEditForm((prev) => ({ ...prev, email: e.target.value }))}
 																	placeholder='Contact email'
 																	type='email'
 																	className='text-sm'
@@ -246,11 +247,7 @@ export default function Dashboard() {
 																	className='text-xs text-green-600 hover:text-green-700'>
 																	<Check className='w-4 h-4' />
 																</Button>
-																<Button
-																	variant='ghost'
-																	size='sm'
-																	onClick={handleCancelEdit}
-																	className='text-xs text-gray-600 hover:text-gray-700'>
+																<Button variant='ghost' size='sm' onClick={handleCancelEdit} className='text-xs text-gray-600 hover:text-gray-700'>
 																	<X className='w-4 h-4' />
 																</Button>
 															</div>

@@ -2,7 +2,8 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -12,18 +13,18 @@ datasource db {
 
 // Better Auth required models
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified Boolean   @default(false)
-  image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  sessions      Session[]
-  accounts      Account[]
-  emails        Email[]
+  id             String          @id @default(cuid())
+  name           String?
+  email          String          @unique
+  emailVerified  Boolean         @default(false)
+  image          String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  sessions       Session[]
+  accounts       Account[]
+  emails         Email[]
   calendarEvents CalendarEvent[]
-  contacts      Contact[]
+  contacts       Contact[]
 
   @@map("user")
 }
@@ -76,15 +77,15 @@ model Verification {
 model Email {
   id          String   @id @default(cuid())
   googleId    String   @unique // Gmail message ID
-  threadId    String?  // Gmail thread ID
+  threadId    String? // Gmail thread ID
   subject     String?
   fromEmail   String?
   fromName    String?
-  toEmails    String?  // JSON array of recipients
-  body        String?  // Email body/snippet
+  toEmails    String? // JSON array of recipients
+  body        String? // Email body/snippet
   isRead      Boolean  @default(false)
   isImportant Boolean  @default(false)
-  labels      String?  // JSON array of Gmail labels
+  labels      String? // JSON array of Gmail labels
   receivedAt  DateTime
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -96,21 +97,21 @@ model Email {
 }
 
 model CalendarEvent {
-  id          String    @id @default(cuid())
-  googleId    String    @unique // Google Calendar event ID
+  id          String   @id @default(cuid())
+  googleId    String   @unique // Google Calendar event ID
   title       String?
   description String?
   location    String?
   startTime   DateTime
   endTime     DateTime
-  isAllDay    Boolean   @default(false)
-  status      String?   // confirmed, tentative, cancelled
-  attendees   String?   // JSON array of attendees
-  organizer   String?   // Organizer email
+  isAllDay    Boolean  @default(false)
+  status      String? // confirmed, tentative, cancelled
+  attendees   String? // JSON array of attendees
+  organizer   String? // Organizer email
   userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([userId, startTime])
   @@map("calendar_event")
@@ -118,17 +119,17 @@ model CalendarEvent {
 
 // Contact management
 model Contact {
-  id                String   @id @default(cuid())
-  email             String   // Contact's email (primary identifier)
-  name              String?  // Most complete name found
+  id                String    @id @default(cuid())
+  email             String // Contact's email (primary identifier)
+  name              String? // Most complete name found
   lastInteractionAt DateTime // Last email or calendar interaction
-  interactionCount  Int      @default(1) // Total interactions (emails + calendar events)
-  archived          Boolean  @default(false) // Whether contact is archived
+  interactionCount  Int       @default(1) // Total interactions (emails + calendar events)
+  archived          Boolean   @default(false) // Whether contact is archived
   archivedAt        DateTime? // When contact was archived
-  userId            String   // User who this contact belongs to
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  userId            String // User who this contact belongs to
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   @@unique([userId, email]) // Unique contact per user per email
   @@index([userId, lastInteractionAt])
