@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
-import type { Contact, Email, CalendarEvent } from '@prisma/client';
-import { TimelineItem, TimelineEmailItem, TimelineCalendarItem } from '@/lib/types';
+import type { Contact } from '@prisma/client';
+import { TimelineItem } from '@/lib/types';
 
 // Patterns to identify automated/newsletter emails
 const AUTOMATED_EMAIL_PATTERNS = [
@@ -23,6 +23,7 @@ const AUTOMATED_EMAIL_PATTERNS = [
 	/hello@/i,
 	/invoice@/i,
 	/updates@/i,
+	/mail@/i,
 ];
 
 const AUTOMATED_DOMAINS = ['mail.google.com', 'calendar-notification@google.com', 'email.apple.com', 'bounce.email'];
@@ -69,12 +70,7 @@ export function getBestName(existingName: string | null, newName: string | null)
 	return existingName;
 }
 
-export async function createOrUpdateContact(
-	userId: string, 
-	email: string, 
-	name: string | null, 
-	interactionDate: Date
-): Promise<Contact | null> {
+export async function createOrUpdateContact(userId: string, email: string, name: string | null, interactionDate: Date): Promise<Contact | null> {
 	// Skip if automated email
 	if (isAutomatedEmail(email, name || undefined)) {
 		return null;
@@ -86,9 +82,9 @@ export async function createOrUpdateContact(
 	// Skip if this is the user's own email
 	const user = await prisma.user.findUnique({
 		where: { id: userId },
-		select: { email: true }
+		select: { email: true },
 	});
-	
+
 	if (user && user.email.toLowerCase() === cleanEmail) {
 		console.log(`Skipping user's own email: ${cleanEmail}`);
 		return null;
@@ -117,19 +113,13 @@ export async function createOrUpdateContact(
 				prisma.email.count({
 					where: {
 						userId,
-						OR: [
-							{ fromEmail: cleanEmail },
-							{ toEmails: { contains: cleanEmail } },
-						],
+						OR: [{ fromEmail: cleanEmail }, { toEmails: { contains: cleanEmail } }],
 					},
 				}),
 				prisma.calendarEvent.count({
 					where: {
 						userId,
-						OR: [
-							{ organizer: cleanEmail },
-							{ attendees: { contains: cleanEmail } },
-						],
+						OR: [{ organizer: cleanEmail }, { attendees: { contains: cleanEmail } }],
 					},
 				}),
 			]);
@@ -290,7 +280,7 @@ export async function getContactTimeline(userId: string, contactEmail: string): 
 
 export async function recalculateAllInteractionCounts(userId: string): Promise<void> {
 	console.log(`Recalculating interaction counts for user ${userId}`);
-	
+
 	// Get all non-archived contacts for the user
 	const contacts = await prisma.contact.findMany({
 		where: {
@@ -309,19 +299,13 @@ export async function recalculateAllInteractionCounts(userId: string): Promise<v
 			prisma.email.count({
 				where: {
 					userId,
-					OR: [
-						{ fromEmail: contact.email },
-						{ toEmails: { contains: contact.email } },
-					],
+					OR: [{ fromEmail: contact.email }, { toEmails: { contains: contact.email } }],
 				},
 			}),
 			prisma.calendarEvent.count({
 				where: {
 					userId,
-					OR: [
-						{ organizer: contact.email },
-						{ attendees: { contains: contact.email } },
-					],
+					OR: [{ organizer: contact.email }, { attendees: { contains: contact.email } }],
 				},
 			}),
 		]);

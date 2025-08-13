@@ -2,7 +2,6 @@
 
 import { Button } from '@/components/ui/button';
 import { signOut, useSession } from '@/lib/auth-client';
-import { Network } from 'lucide-react';
 import Link from 'next/link';
 
 export function AppNavigation() {
