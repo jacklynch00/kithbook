@@ -213,9 +213,23 @@ export default function Dashboard() {
 						{/* Sync Results */}
 						{syncResult && (
 							<div className='max-w-2xl mx-auto p-4 border rounded-lg text-left'>
-								<h3 className='font-semibold mb-2'>Sync Results:</h3>
+								<h3 className='font-semibold mb-2'>Sync Status:</h3>
 								{syncResult.success ? (
 									<div className='space-y-2'>
+										{syncResult.results?.message && (
+											<p className='text-green-600'>
+												✅ {syncResult.results.message}
+											</p>
+										)}
+										{syncResult.results?.triggers && syncResult.results.triggers.length > 0 && (
+											<div className='text-blue-600'>
+												<p>Background jobs started:</p>
+												{syncResult.results.triggers.map((trigger, i: number) => (
+													<p key={i}>• {trigger.service} sync (Job ID: {trigger.jobId})</p>
+												))}
+											</div>
+										)}
+										{/* Legacy support for old sync results */}
 										{syncResult.results?.gmail && (
 											<p className='text-green-600'>
 												📧 Gmail: {syncResult.results.gmail.syncedCount} new emails synced (of {syncResult.results.gmail.totalFound} found)
@@ -234,6 +248,9 @@ export default function Dashboard() {
 												))}
 											</div>
 										)}
+										<p className='text-sm text-muted-foreground mt-2'>
+											💡 Sync jobs are running in the background. Your contacts will update automatically when complete.
+										</p>
 									</div>
 								) : (
 									<p className='text-red-600'>

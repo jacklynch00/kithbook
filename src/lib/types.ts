@@ -120,6 +120,13 @@ export const SyncResultSchema = z.object({
   error: z.string().optional(),
   details: z.string().optional(),
   results: z.object({
+    triggers: z.array(z.object({
+      service: z.string(),
+      jobId: z.string(),
+    })).optional(),
+    errors: z.array(z.string()).optional(),
+    message: z.string().optional(),
+    // Legacy fields for backward compatibility
     gmail: z.object({
       syncedCount: z.number(),
       totalFound: z.number(),
@@ -128,7 +135,6 @@ export const SyncResultSchema = z.object({
       syncedCount: z.number(),
       totalFound: z.number(),
     }).optional(),
-    errors: z.array(z.string()),
   }).optional(),
 });
 

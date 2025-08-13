@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { syncGmailForUser } from '@/lib/services/gmail-sync';
-import { syncCalendarForUser } from '@/lib/services/calendar-sync';
+import { tasks } from '@trigger.dev/sdk/v3';
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,33 +15,42 @@ export async function POST(request: NextRequest) {
 
     console.log(`Manual sync requested for user ${session.user.id}`);
 
-    const results = {
-      gmail: null as any,
-      calendar: null as any,
-      errors: [] as string[],
-    };
+    const triggers = [];
+    const errors = [];
 
-    // Try Gmail sync
+    // Trigger Gmail sync job
     try {
-      results.gmail = await syncGmailForUser(session.user.id);
-      console.log(`Gmail sync completed: ${results.gmail.syncedCount} emails`);
+      const gmailHandle = await tasks.trigger("manual-gmail-sync", { userId: session.user.id });
+      triggers.push({
+        service: 'Gmail',
+        jobId: gmailHandle.id,
+      });
+      console.log(`Gmail sync job triggered: ${gmailHandle.id}`);
     } catch (gmailError) {
-      console.error('Gmail sync failed:', gmailError);
-      results.errors.push(`Gmail sync failed: ${gmailError instanceof Error ? gmailError.message : 'Unknown error'}`);
+      console.error('Failed to trigger Gmail sync:', gmailError);
+      errors.push(`Failed to trigger Gmail sync: ${gmailError instanceof Error ? gmailError.message : 'Unknown error'}`);
     }
 
-    // Try Calendar sync
+    // Trigger Calendar sync job  
     try {
-      results.calendar = await syncCalendarForUser(session.user.id);
-      console.log(`Calendar sync completed: ${results.calendar.syncedCount} events`);
+      const calendarHandle = await tasks.trigger("manual-calendar-sync", { userId: session.user.id });
+      triggers.push({
+        service: 'Calendar',
+        jobId: calendarHandle.id,
+      });
+      console.log(`Calendar sync job triggered: ${calendarHandle.id}`);
     } catch (calendarError) {
-      console.error('Calendar sync failed:', calendarError);
-      results.errors.push(`Calendar sync failed: ${calendarError instanceof Error ? calendarError.message : 'Unknown error'}`);
+      console.error('Failed to trigger Calendar sync:', calendarError);
+      errors.push(`Failed to trigger Calendar sync: ${calendarError instanceof Error ? calendarError.message : 'Unknown error'}`);
     }
 
     return NextResponse.json({
       success: true,
-      results,
+      results: {
+        triggers,
+        errors,
+        message: `Triggered ${triggers.length} sync job(s). Jobs are running in the background.`
+      },
     });
 
   } catch (error) {
