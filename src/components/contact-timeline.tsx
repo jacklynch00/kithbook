@@ -3,10 +3,12 @@
 import { useContactTimeline } from '@/hooks/use-contacts';
 import { Button } from '@/components/ui/button';
 import { ContactAvatar } from '@/components/contact-avatar';
-import { X, Mail, Calendar, MapPin, Clock, Eye, ChevronDown, ChevronUp } from 'lucide-react';
+import { useContactSummary, useExistingContactSummary, ContactSummary } from '@/hooks/use-contact-summary';
+import { X, Mail, Calendar, MapPin, Clock, Eye, ChevronDown, ChevronUp, Brain, Sparkles, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { TimelineItem } from '@/lib/types';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface ContactTimelineProps {
   contactEmail: string;
@@ -18,6 +20,22 @@ interface ContactTimelineProps {
 export function ContactTimeline({ contactEmail, contactName, profileImageUrl, onClose }: ContactTimelineProps) {
   const { data: timeline = [], isLoading, error } = useContactTimeline(contactEmail);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const queryClient = useQueryClient();
+  
+  // Fetch existing summary
+  const { data: existingSummary, isLoading: isLoadingExisting } = useExistingContactSummary(contactEmail);
+  const { mutate: generateSummary, isPending: isGeneratingSummary } = useContactSummary();
+
+  // Use existing summary if available
+  const [aiSummary, setAiSummary] = useState<ContactSummary | null>(null);
+  const [showAiSummary, setShowAiSummary] = useState(false);
+
+  useEffect(() => {
+    if (existingSummary) {
+      setAiSummary(existingSummary);
+      setShowAiSummary(true);
+    }
+  }, [existingSummary]);
 
   const toggleExpanded = (itemId: string) => {
     const newExpanded = new Set(expandedItems);
@@ -29,30 +47,117 @@ export function ContactTimeline({ contactEmail, contactName, profileImageUrl, on
     setExpandedItems(newExpanded);
   };
 
+  const handleGenerateAiSummary = () => {
+    generateSummary(contactEmail, {
+      onSuccess: (summary) => {
+        setAiSummary(summary);
+        setShowAiSummary(true);
+        // Invalidate the existing summary cache to refresh it
+        queryClient.invalidateQueries({ queryKey: ['contact-summary', contactEmail] });
+      }
+    });
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="bg-background rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="p-6 border-b flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <ContactAvatar
-              name={contactName}
-              email={contactEmail}
-              profileImageUrl={profileImageUrl}
-              size="lg"
-            />
-            <div>
-              <h2 className="text-2xl font-bold">
-                {contactName || contactEmail}
-              </h2>
-              {contactName && (
-                <p className="text-muted-foreground">{contactEmail}</p>
-              )}
+        <div className="p-6 border-b">
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex items-center gap-4">
+              <ContactAvatar
+                name={contactName}
+                email={contactEmail}
+                profileImageUrl={profileImageUrl}
+                size="lg"
+              />
+              <div>
+                <h2 className="text-2xl font-bold">
+                  {contactName || contactEmail}
+                </h2>
+                {contactName && (
+                  <p className="text-muted-foreground">{contactEmail}</p>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleGenerateAiSummary}
+                disabled={isGeneratingSummary || isLoadingExisting}
+                className="flex items-center gap-2"
+              >
+                {isGeneratingSummary ? (
+                  <Sparkles className="h-4 w-4 animate-pulse" />
+                ) : existingSummary ? (
+                  <RefreshCw className="h-4 w-4" />
+                ) : (
+                  <Brain className="h-4 w-4" />
+                )}
+                {isGeneratingSummary ? 'Generating...' : 
+                 existingSummary ? 'Regenerate' : 'AI Summary'}
+              </Button>
+              <Button variant="ghost" size="icon" onClick={onClose}>
+                <X className="h-4 w-4" />
+              </Button>
             </div>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
+
+          {/* AI Summary Section */}
+          {showAiSummary && aiSummary && (
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Brain className="h-5 w-5 text-blue-600" />
+                <h3 className="font-semibold text-blue-900">AI Summary</h3>
+                <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded">
+                  {aiSummary.totalEmails} emails analyzed
+                </span>
+              </div>
+              
+              <div className="space-y-3">
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  {aiSummary.summary}
+                </p>
+                
+                {aiSummary.keyTopics.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-medium text-gray-600 mb-2">Key Topics</h4>
+                    <div className="flex flex-wrap gap-1">
+                      {aiSummary.keyTopics.map((topic, index) => (
+                        <span
+                          key={index}
+                          className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full"
+                        >
+                          {topic}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {aiSummary.relationshipInsights.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-medium text-gray-600 mb-2">Insights</h4>
+                    <ul className="text-xs text-gray-600 space-y-1">
+                      {aiSummary.relationshipInsights.map((insight, index) => (
+                        <li key={index} className="flex items-start gap-1">
+                          <span className="text-blue-500 mt-1">•</span>
+                          <span>{insight}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {aiSummary.dateRange && (
+                  <div className="text-xs text-gray-500 pt-2 border-t border-blue-200">
+                    Email history: {aiSummary.dateRange.earliest.toLocaleDateString()} - {aiSummary.dateRange.latest.toLocaleDateString()}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Timeline Content */}

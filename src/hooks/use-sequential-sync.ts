@@ -5,6 +5,17 @@ import { SyncResult, SyncResultSchema } from '@/lib/types';
 import { toast } from 'sonner';
 import { useJobStatus } from './use-job-status';
 
+// JobStatus interface
+interface JobStatus {
+  id: string;
+  status: string;
+  completedAt?: string | null;
+  failedAt?: string | null;
+  startedAt?: string | null;
+  createdAt?: string | null;
+  error?: string;
+}
+
 async function syncData(): Promise<SyncResult> {
   const response = await fetch('/api/sync', {
     method: 'POST',
@@ -100,7 +111,7 @@ export function useSequentialSync() {
 
   // Check for Gmail job when calendar job completes
   useEffect(() => {
-    const calendarJob = completedJobs.find(job => job.id && !isCheckingForGmailJob);
+    const calendarJob = completedJobs.find((job: JobStatus) => job.id && !isCheckingForGmailJob);
     
     if (calendarJob && !isCheckingForGmailJob) {
       setIsCheckingForGmailJob(true);

@@ -37,13 +37,14 @@ async function fetchJobStatuses(jobIds: string[]): Promise<JobStatusResponse> {
 export function useJobStatus(jobIds: string[], enabled: boolean = true) {
   const queryClient = useQueryClient();
 
-  const query = useQuery({
+  const query = useQuery<JobStatusResponse>({
     queryKey: ['jobStatus', jobIds],
     queryFn: () => fetchJobStatuses(jobIds),
     enabled: enabled && jobIds.length > 0,
-    refetchInterval: (data) => {
+    refetchInterval: (query) => {
       // Stop polling if all jobs are completed or failed
-      const allJobsFinished = data?.jobs?.every(job => 
+      const data = query.state.data as JobStatusResponse | undefined;
+      const allJobsFinished = data?.jobs?.every((job: JobStatus) => 
         job.status === 'COMPLETED' || 
         job.status === 'FAILED' || 
         job.status === 'CANCELLED' ||
@@ -60,18 +61,18 @@ export function useJobStatus(jobIds: string[], enabled: boolean = true) {
   useEffect(() => {
     if (!query.data?.jobs) return;
 
-    const completedJobs = query.data.jobs.filter(job => 
+    const completedJobs = query.data.jobs.filter((job: JobStatus) => 
       job.status === 'COMPLETED' && job.completedAt
     );
     
-    const failedJobs = query.data.jobs.filter(job => 
+    const failedJobs = query.data.jobs.filter((job: JobStatus) => 
       job.status === 'FAILED' && job.failedAt
     );
 
     // Check if any jobs just completed
     if (completedJobs.length > 0) {
       // For sequential sync, we want to check if this is a complete sync cycle
-      const allJobsFinished = query.data.jobs.every(job => 
+      const allJobsFinished = query.data.jobs.every((job: JobStatus) => 
         job.status === 'COMPLETED' || 
         job.status === 'FAILED' || 
         job.status === 'CANCELLED' ||
@@ -85,7 +86,7 @@ export function useJobStatus(jobIds: string[], enabled: boolean = true) {
         queryClient.invalidateQueries({ queryKey: ['networkGraph'] });
         
         // Show success notification
-        const successfulJobs = query.data.jobs.filter(job => job.status === 'COMPLETED').length;
+        const successfulJobs = query.data.jobs.filter((job: JobStatus) => job.status === 'COMPLETED').length;
         const totalJobs = query.data.jobs.length;
         
         if (successfulJobs === totalJobs) {
@@ -104,15 +105,15 @@ export function useJobStatus(jobIds: string[], enabled: boolean = true) {
 
   return {
     ...query,
-    allJobsCompleted: query.data?.jobs?.every(job => 
+    allJobsCompleted: query.data?.jobs?.every((job: JobStatus) => 
       job.status === 'COMPLETED' || 
       job.status === 'FAILED' || 
       job.status === 'CANCELLED' ||
       job.status === 'UNKNOWN'
     ) ?? false,
-    completedJobs: query.data?.jobs?.filter(job => job.status === 'COMPLETED') ?? [],
-    failedJobs: query.data?.jobs?.filter(job => job.status === 'FAILED') ?? [],
-    runningJobs: query.data?.jobs?.filter(job => 
+    completedJobs: query.data?.jobs?.filter((job: JobStatus) => job.status === 'COMPLETED') ?? [],
+    failedJobs: query.data?.jobs?.filter((job: JobStatus) => job.status === 'FAILED') ?? [],
+    runningJobs: query.data?.jobs?.filter((job: JobStatus) => 
       job.status === 'QUEUED' || 
       job.status === 'EXECUTING' || 
       job.status === 'WAITING_FOR_DEPLOY'

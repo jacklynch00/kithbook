@@ -26,6 +26,7 @@ model User {
   emails         Email[]
   calendarEvents CalendarEvent[]
   contacts       Contact[]
+  contactSummaries ContactSummary[]
 
   @@map("user")
 }
@@ -94,6 +95,8 @@ model Email {
   updatedAt   DateTime @updatedAt
 
   @@index([userId, receivedAt])
+  @@index([userId, fromEmail])
+  @@index([fromEmail])
   @@map("email")
 }
 
@@ -115,6 +118,8 @@ model CalendarEvent {
   updatedAt   DateTime @updatedAt
 
   @@index([userId, startTime])
+  @@index([userId, organizer])
+  @@index([organizer])
   @@map("calendar_event")
 }
 
@@ -138,4 +143,24 @@ model Contact {
   @@index([userId, email])
   @@index([userId, archived]) // Index for filtering archived contacts
   @@map("contact")
+}
+
+// AI-generated contact summaries
+model ContactSummary {
+  id                    String   @id @default(cuid())
+  contactEmail          String // Contact's email address
+  summary               String // AI-generated summary text
+  keyTopics             String // JSON array of key topics
+  relationshipInsights  String // JSON array of relationship insights
+  totalEmails           Int // Number of emails analyzed
+  earliestEmail         DateTime? // Date of earliest email analyzed
+  latestEmail           DateTime? // Date of latest email analyzed
+  userId                String // User who owns this summary
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([userId, contactEmail]) // One summary per user per contact
+  @@index([userId, contactEmail])
+  @@map("contact_summary")
 }

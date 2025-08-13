@@ -239,28 +239,102 @@ export async function unarchiveContact(userId: string, contactId: string): Promi
 	}
 }
 
-export async function getContactTimeline(userId: string, contactEmail: string): Promise<TimelineItem[]> {
-	// Get all emails and calendar events for this contact
-	const [emails, calendarEvents] = await Promise.all([
+export async function getContactTimeline(
+	userId: string, 
+	contactEmail: string, 
+	limit: number = 50
+): Promise<TimelineItem[]> {
+	const cleanEmail = contactEmail.toLowerCase();
+	
+	// Optimize queries with proper indexing and field selection
+	const [emailsFrom, emailsTo, eventsOrganized, eventsAttending] = await Promise.all([
+		// Direct fromEmail lookup (uses index) 
 		prisma.email.findMany({
 			where: {
 				userId,
-				OR: [{ fromEmail: contactEmail }, { toEmails: { contains: contactEmail } }],
+				fromEmail: cleanEmail,
+			},
+			select: {
+				id: true,
+				subject: true,
+				fromEmail: true,
+				fromName: true,
+				body: true,
+				isRead: true,
+				receivedAt: true,
 			},
 			orderBy: { receivedAt: 'desc' },
+			take: Math.ceil(limit * 0.7), // Bias toward emails since they're more common
 		}),
+		// Separate query for emails TO this contact (JSON search - slower)
+		prisma.email.findMany({
+			where: {
+				userId,
+				toEmails: { contains: cleanEmail },
+				NOT: { fromEmail: cleanEmail }, // Avoid duplicates
+			},
+			select: {
+				id: true,
+				subject: true,
+				fromEmail: true,
+				fromName: true,
+				body: true,
+				isRead: true,
+				receivedAt: true,
+			},
+			orderBy: { receivedAt: 'desc' },
+			take: Math.ceil(limit * 0.3),
+		}),
+		// Direct organizer lookup (uses index)
 		prisma.calendarEvent.findMany({
 			where: {
 				userId,
-				OR: [{ organizer: contactEmail }, { attendees: { contains: contactEmail } }],
+				organizer: cleanEmail,
+			},
+			select: {
+				id: true,
+				title: true,
+				startTime: true,
+				endTime: true,
+				location: true,
+				description: true,
+				status: true,
+				organizer: true,
 			},
 			orderBy: { startTime: 'desc' },
+			take: Math.ceil(limit * 0.3),
+		}),
+		// Separate query for events with this attendee (JSON search - slower)
+		prisma.calendarEvent.findMany({
+			where: {
+				userId,
+				attendees: { contains: cleanEmail },
+				NOT: { organizer: cleanEmail }, // Avoid duplicates
+			},
+			select: {
+				id: true,
+				title: true,
+				startTime: true,
+				endTime: true,
+				location: true,
+				description: true,
+				status: true,
+				organizer: true,
+			},
+			orderBy: { startTime: 'desc' },
+			take: Math.ceil(limit * 0.3),
 		}),
 	]);
 
-	// Combine and sort by date
-	const timeline = [
-		...emails.map((email) => ({
+	// Combine all email results
+	const allEmails = [...emailsFrom, ...emailsTo];
+	
+	// Combine all calendar results
+	const allCalendarEvents = [...eventsOrganized, ...eventsAttending];
+
+	// Transform and combine timeline items
+	const timeline: TimelineItem[] = [
+		...allEmails.map((email) => ({
 			id: email.id,
 			type: 'email' as const,
 			date: email.receivedAt,
@@ -272,7 +346,7 @@ export async function getContactTimeline(userId: string, contactEmail: string): 
 				isRead: email.isRead,
 			},
 		})),
-		...calendarEvents.map((event) => ({
+		...allCalendarEvents.map((event) => ({
 			id: event.id,
 			type: 'calendar' as const,
 			date: event.startTime,
@@ -286,9 +360,12 @@ export async function getContactTimeline(userId: string, contactEmail: string): 
 				organizer: event.organizer,
 			},
 		})),
-	].sort((a, b) => b.date.getTime() - a.date.getTime());
+	];
 
-	return timeline;
+	// Sort by date and apply final limit
+	return timeline
+		.sort((a, b) => b.date.getTime() - a.date.getTime())
+		.slice(0, limit);
 }
 
 export async function recalculateAllInteractionCounts(userId: string): Promise<void> {

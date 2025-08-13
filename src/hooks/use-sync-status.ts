@@ -23,11 +23,12 @@ async function fetchSyncStatus(): Promise<SyncStatus> {
 }
 
 export function useSyncStatus() {
-  return useQuery({
+  return useQuery<SyncStatus>({
     queryKey: ['syncStatus'],
     queryFn: fetchSyncStatus,
-    refetchInterval: (data) => {
+    refetchInterval: (query) => {
       // Refetch every minute if user can't sync yet
+      const data = query.state.data as SyncStatus | undefined;
       return data?.canSync === false ? 60 * 1000 : false;
     },
     staleTime: 30 * 1000, // Consider data stale after 30 seconds
