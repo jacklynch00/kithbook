@@ -122,13 +122,9 @@ export function ContactTimeline({ contactEmail, contactName, onClose }: ContactT
                             </div>
                             {item.details.body && (
                               <div className="text-sm text-muted-foreground">
-                                {isExpanded ? (
-                                  <div className="whitespace-pre-wrap max-h-96 overflow-y-auto p-3 bg-background rounded border">
-                                    {item.details.body}
-                                  </div>
-                                ) : (
-                                  <p className="line-clamp-3">{item.details.body}</p>
-                                )}
+                                <div className="whitespace-pre-wrap max-h-96 overflow-y-auto p-3 bg-background rounded border">
+                                  {item.details.body}
+                                </div>
                               </div>
                             )}
                           </div>

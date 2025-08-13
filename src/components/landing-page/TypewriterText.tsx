@@ -45,5 +45,5 @@ export default function TypewriterText({ words, typingSpeed = 100, deletingSpeed
 		return () => clearTimeout(timeout);
 	}, [currentText, currentWordIndex, isDeleting, words, typingSpeed, deletingSpeed, delayBetweenWords]);
 
-	return <span className='text-black'>{currentText}</span>;
+	return <span className='text-black h-[1.2em] inline-block leading-[1.2em]'>{currentText}</span>;
 }

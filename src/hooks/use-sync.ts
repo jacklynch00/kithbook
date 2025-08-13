@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { contactsKeys } from './use-contacts';
 import { SyncResult, SyncResultSchema } from '@/lib/types';
+import { toast } from 'sonner';
 
 async function syncData(): Promise<SyncResult> {
   const response = await fetch('/api/sync', {
@@ -33,7 +34,17 @@ export function useSync() {
   
   return useMutation({
     mutationFn: syncData,
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Show success toast with job count
+      const jobCount = data.results?.triggers?.length || 0;
+      if (jobCount > 0) {
+        toast.success(`Background sync started`, {
+          description: `${jobCount} sync job(s) are running in the background.`
+        });
+      } else {
+        toast.success('Sync completed');
+      }
+      
       // Invalidate and refetch contacts after successful sync
       queryClient.invalidateQueries({ queryKey: contactsKeys.all });
       // Also invalidate network graph data since it depends on contacts
@@ -41,6 +52,9 @@ export function useSync() {
     },
     onError: (error) => {
       console.error('Sync failed:', error);
+      toast.error('Sync failed', {
+        description: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
     },
   });
 }
