@@ -2,6 +2,7 @@
 
 import { useContactTimeline } from '@/hooks/use-contacts';
 import { Button } from '@/components/ui/button';
+import { ContactAvatar } from '@/components/contact-avatar';
 import { X, Mail, Calendar, MapPin, Clock, Eye, ChevronDown, ChevronUp } from 'lucide-react';
 import { format } from 'date-fns';
 import { TimelineItem } from '@/lib/types';
@@ -10,10 +11,11 @@ import { useState } from 'react';
 interface ContactTimelineProps {
   contactEmail: string;
   contactName: string | null;
+  profileImageUrl?: string | null;
   onClose: () => void;
 }
 
-export function ContactTimeline({ contactEmail, contactName, onClose }: ContactTimelineProps) {
+export function ContactTimeline({ contactEmail, contactName, profileImageUrl, onClose }: ContactTimelineProps) {
   const { data: timeline = [], isLoading, error } = useContactTimeline(contactEmail);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
@@ -32,13 +34,21 @@ export function ContactTimeline({ contactEmail, contactName, onClose }: ContactT
       <div className="bg-background rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="p-6 border-b flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-bold">
-              {contactName || contactEmail}
-            </h2>
-            {contactName && (
-              <p className="text-muted-foreground">{contactEmail}</p>
-            )}
+          <div className="flex items-center gap-4">
+            <ContactAvatar
+              name={contactName}
+              email={contactEmail}
+              profileImageUrl={profileImageUrl}
+              size="lg"
+            />
+            <div>
+              <h2 className="text-2xl font-bold">
+                {contactName || contactEmail}
+              </h2>
+              {contactName && (
+                <p className="text-muted-foreground">{contactEmail}</p>
+              )}
+            </div>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="h-4 w-4" />

@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import type { Contact } from '@prisma/client';
 import { TimelineItem } from '@/lib/types';
+import { updateContactWithProfileImage } from './google-people';
 
 // Patterns to identify automated/newsletter emails
 const AUTOMATED_EMAIL_PATTERNS = [
@@ -136,6 +137,13 @@ export async function createOrUpdateContact(userId: string, email: string, name:
 				},
 			});
 
+			// Fetch profile image if we don't have one
+			if (!existingContact.profileImageUrl) {
+				updateContactWithProfileImage(userId, cleanEmail).catch(error => {
+					console.error('Failed to fetch profile image:', error);
+				});
+			}
+
 			return updatedContact;
 		} else {
 			// For new contacts, start with count of 1 (will be corrected on next update)
@@ -147,6 +155,11 @@ export async function createOrUpdateContact(userId: string, email: string, name:
 					lastInteractionAt: interactionDate,
 					interactionCount: 1,
 				},
+			});
+
+			// Fetch profile image for new contact
+			updateContactWithProfileImage(userId, cleanEmail).catch(error => {
+				console.error('Failed to fetch profile image for new contact:', error);
 			});
 
 			return newContact;

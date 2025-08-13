@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { tasks } from '@trigger.dev/sdk/v3';
+import { prisma } from '@/lib/prisma';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,6 +15,33 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`Manual sync requested for user ${session.user.id}`);
+
+    // Check rate limiting - only allow sync once per hour
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { lastSyncAt: true }
+    });
+
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+
+    if (user?.lastSyncAt && user.lastSyncAt > oneHourAgo) {
+      const nextAllowedSync = new Date(user.lastSyncAt.getTime() + 60 * 60 * 1000);
+      const minutesUntilNext = Math.ceil((nextAllowedSync.getTime() - now.getTime()) / (1000 * 60));
+      
+      return NextResponse.json({
+        success: false,
+        error: 'Rate limited',
+        details: `You can sync again in ${minutesUntilNext} minute(s). Last sync was at ${user.lastSyncAt.toLocaleTimeString()}.`,
+        nextAllowedAt: nextAllowedSync.toISOString()
+      }, { status: 429 });
+    }
+
+    // Update lastSyncAt timestamp
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: { lastSyncAt: now }
+    });
 
     const triggers = [];
     const errors = [];

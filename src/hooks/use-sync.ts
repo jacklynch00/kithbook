@@ -45,6 +45,8 @@ export function useSync() {
         toast.success('Sync completed');
       }
       
+      // Invalidate sync status to update UI
+      queryClient.invalidateQueries({ queryKey: ['syncStatus'] });
       // Invalidate and refetch contacts after successful sync
       queryClient.invalidateQueries({ queryKey: contactsKeys.all });
       // Also invalidate network graph data since it depends on contacts
@@ -52,9 +54,20 @@ export function useSync() {
     },
     onError: (error) => {
       console.error('Sync failed:', error);
-      toast.error('Sync failed', {
-        description: error instanceof Error ? error.message : 'Unknown error occurred'
-      });
+      
+      // Handle rate limiting errors specially
+      if (error instanceof Error && error.message.includes('Rate limited')) {
+        toast.error('Sync rate limited', {
+          description: error.message
+        });
+      } else {
+        toast.error('Sync failed', {
+          description: error instanceof Error ? error.message : 'Unknown error occurred'
+        });
+      }
+      
+      // Invalidate sync status to update UI even on error
+      queryClient.invalidateQueries({ queryKey: ['syncStatus'] });
     },
   });
 }

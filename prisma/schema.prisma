@@ -18,6 +18,7 @@ model User {
   email          String          @unique
   emailVerified  Boolean         @default(false)
   image          String?
+  lastSyncAt     DateTime?       // Track last manual sync time for rate limiting
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   sessions       Session[]
@@ -122,6 +123,7 @@ model Contact {
   id                String    @id @default(cuid())
   email             String // Contact's email (primary identifier)
   name              String? // Most complete name found
+  profileImageUrl   String? // Google profile image URL
   lastInteractionAt DateTime // Last email or calendar interaction
   interactionCount  Int       @default(1) // Total interactions (emails + calendar events)
   archived          Boolean   @default(false) // Whether contact is archived

@@ -9,6 +9,7 @@ export const ContactSchema = z.object({
   id: z.string(),
   email: z.string().email(),
   name: z.string().nullable(),
+  profileImageUrl: z.string().nullable(),
   lastInteractionAt: z.coerce.date(),
   interactionCount: z.number().int().min(0), // Allow 0 for new contacts
   archived: z.boolean(),
@@ -119,6 +120,7 @@ export const SyncResultSchema = z.object({
   success: z.boolean(),
   error: z.string().optional(),
   details: z.string().optional(),
+  nextAllowedAt: z.string().optional(), // ISO string for rate limiting
   results: z.object({
     triggers: z.array(z.object({
       service: z.string(),
