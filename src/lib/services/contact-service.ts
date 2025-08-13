@@ -255,7 +255,7 @@ export async function getContactTimeline(userId: string, contactEmail: string): 
 			details: {
 				from: email.fromEmail,
 				fromName: email.fromName,
-				body: email.body?.substring(0, 200) + (email.body && email.body.length > 200 ? '...' : ''),
+				body: email.body,
 				isRead: email.isRead,
 			},
 		})),
@@ -268,7 +268,7 @@ export async function getContactTimeline(userId: string, contactEmail: string): 
 				startTime: event.startTime,
 				endTime: event.endTime,
 				location: event.location,
-				description: event.description?.substring(0, 200) + (event.description && event.description.length > 200 ? '...' : ''),
+				description: event.description,
 				status: event.status,
 				organizer: event.organizer,
 			},
