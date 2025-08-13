@@ -14,6 +14,10 @@ export async function createGoogleClient(userId: string) {
     throw new Error(`No Google account found for user ${userId}`);
   }
 
+  if (!account.refreshToken) {
+    throw new Error(`No refresh token found for user ${userId}. Please re-authenticate with Google to grant offline access.`);
+  }
+
   // Create OAuth2 client
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,

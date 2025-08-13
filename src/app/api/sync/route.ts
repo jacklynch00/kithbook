@@ -42,7 +42,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Sync completed',
       results,
     });
 
@@ -50,6 +49,7 @@ export async function POST(request: NextRequest) {
     console.error('Sync API error:', error);
     return NextResponse.json(
       { 
+        success: false,
         error: 'Sync failed', 
         details: error instanceof Error ? error.message : 'Unknown error' 
       }, 

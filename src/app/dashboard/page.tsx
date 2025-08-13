@@ -2,31 +2,27 @@
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { signOut, useSession } from '@/lib/auth-client';
-import { redirect } from 'next/navigation';
 import { useState, useMemo } from 'react';
 import { useContacts, useArchiveContact, useUpdateContact } from '@/hooks/use-contacts';
 import { useSync } from '@/hooks/use-sync';
-import { useNetworkGraph } from '@/hooks/use-network-graph';
 import { ContactTimeline } from '@/components/contact-timeline';
-import { NetworkGraph } from '@/components/network-graph';
+import { NetworkGraphModal } from '@/components/network-graph-modal';
+import { DashboardLayout } from '@/components/dashboard-layout';
 import { ContactType } from '@/lib/types';
 import { Archive, Network, Edit3, Check, X } from 'lucide-react';
-import Link from 'next/link';
 
 export default function Dashboard() {
-	const { data: session, isPending } = useSession();
 	const [searchTerm, setSearchTerm] = useState('');
 	const [selectedContact, setSelectedContact] = useState<ContactType | null>(null);
 	const [editingContact, setEditingContact] = useState<string | null>(null);
 	const [editForm, setEditForm] = useState({ name: '', email: '' });
+	const [showNetworkModal, setShowNetworkModal] = useState(false);
 
 	// React Query hooks
 	const { data: allContacts = [], isLoading: loadingContacts, error: contactsError } = useContacts();
 	const { mutate: syncData, isPending: syncing, data: syncResult, error: syncError } = useSync();
 	const { mutate: archiveContact, isPending: archiving } = useArchiveContact();
 	const { mutate: updateContact, isPending: updating } = useUpdateContact();
-	const { data: networkData, isLoading: loadingNetwork } = useNetworkGraph();
 
 	const handleSync = () => {
 		syncData();
@@ -80,98 +76,27 @@ export default function Dashboard() {
 		return allContacts.filter((contact) => contact.name?.toLowerCase().includes(searchTerm.toLowerCase()) || contact.email.toLowerCase().includes(searchTerm.toLowerCase()));
 	}, [searchTerm, allContacts]);
 
-	if (isPending) {
-		return (
-			<main className='min-h-screen flex items-center justify-center'>
-				<div className='text-center'>
-					<p>Loading...</p>
-				</div>
-			</main>
-		);
-	}
-
-	if (!session) {
-		return redirect('/');
-	}
-
 	return (
-		<main className='min-h-screen bg-background'>
-			<header className='border-b'>
-				<div className='container mx-auto px-4 py-4 flex justify-between items-center'>
-					<div className='flex items-center gap-8'>
-						<h1 className='text-2xl font-bold'>KithBook</h1>
-						<nav className='flex items-center gap-4'>
-							<Link href='/dashboard' className='text-sm font-medium hover:text-primary transition-colors'>
-								Dashboard
-							</Link>
-							<Link href='/network' className='text-sm font-medium hover:text-primary transition-colors flex items-center gap-1'>
-								<Network className='w-4 h-4' />
-								Network
-							</Link>
-						</nav>
-					</div>
-					<div className='flex items-center gap-4'>
-						<span className='text-sm text-muted-foreground'>Welcome, {session.user.name || session.user.email}</span>
-						<Button onClick={async () => await signOut()} variant='outline'>
-							Sign Out
-						</Button>
-					</div>
-				</div>
-			</header>
+		<DashboardLayout>
 
 			<div className='container mx-auto px-4 py-8'>
 				<div className='max-w-4xl mx-auto space-y-8'>
-					<div className='space-y-6'>
-						{/* Sync Section */}
-						<div className='text-center'>
-							<Button onClick={handleSync} disabled={syncing} size='lg'>
-								{syncing ? 'Syncing...' : 'Sync Gmail & Calendar'}
+					<div className='flex justify-between items-start'>
+						<div className='flex-1'>
+							<h2 className='text-3xl font-bold mb-4'>Welcome to KithBook</h2>
+						</div>
+						<div className='flex items-center gap-3 mt-2'>
+							<Button onClick={() => setShowNetworkModal(true)} variant='outline' size='sm'>
+								<Network className='w-4 h-4 mr-2' />
+								View Network
+							</Button>
+							<Button onClick={handleSync} disabled={syncing} variant='default' size='sm'>
+								{syncing ? 'Syncing...' : 'Sync Data'}
 							</Button>
 						</div>
+					</div>
 
-						{/* Network Graph Section */}
-						<div className='space-y-4'>
-							<div className='flex items-center justify-between'>
-								<h3 className='text-xl font-semibold'>Contact Network</h3>
-								<Link href='/network' className='text-sm text-muted-foreground hover:text-primary transition-colors flex items-center gap-1'>
-									<Network className='w-4 h-4' />
-									View Full Screen
-								</Link>
-							</div>
-
-							<div className='border rounded-lg bg-background' style={{ height: '400px' }}>
-								<NetworkGraph data={networkData} isLoading={loadingNetwork} compact={true} />
-							</div>
-
-							{networkData && (
-								<div className='flex flex-col sm:flex-row justify-between items-center gap-4'>
-									<div className='text-center sm:text-left text-sm text-muted-foreground'>
-										Showing {networkData.nodes.length} contacts with {networkData.edges.length} connections
-									</div>
-
-									{/* Legend */}
-									<div className='flex flex-wrap items-center gap-4 text-xs text-muted-foreground'>
-										<div className='flex items-center gap-1'>
-											<div className='w-3 h-3 rounded-full bg-red-500'></div>
-											<span>Very active (20+)</span>
-										</div>
-										<div className='flex items-center gap-1'>
-											<div className='w-3 h-3 rounded-full bg-orange-500'></div>
-											<span>Active (10-19)</span>
-										</div>
-										<div className='flex items-center gap-1'>
-											<div className='w-3 h-3 rounded-full bg-yellow-500'></div>
-											<span>Moderate (5-9)</span>
-										</div>
-										<div className='flex items-center gap-1'>
-											<div className='w-3 h-3 rounded-full bg-blue-500'></div>
-											<span>Less active (&lt;5)</span>
-										</div>
-									</div>
-								</div>
-							)}
-						</div>
-
+					<div className='space-y-6'>
 						{/* Contacts Section */}
 						<div className='space-y-4'>
 							<div className='flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4'>
@@ -323,6 +248,9 @@ export default function Dashboard() {
 
 			{/* Contact Timeline Modal */}
 			{selectedContact && <ContactTimeline contactEmail={selectedContact.email} contactName={selectedContact.name} onClose={() => setSelectedContact(null)} />}
-		</main>
+
+			{/* Network Graph Modal */}
+			<NetworkGraphModal isOpen={showNetworkModal} onClose={() => setShowNetworkModal(false)} />
+		</DashboardLayout>
 	);
 }
