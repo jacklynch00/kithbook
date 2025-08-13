@@ -12,7 +12,7 @@ import { ContactTimeline } from '@/components/contact-timeline';
 import { NetworkGraphModal } from '@/components/network-graph-modal';
 import { DashboardLayout } from '@/components/dashboard-layout';
 import { ContactType } from '@/lib/types';
-import { Archive, Network, Edit3, Check, X } from 'lucide-react';
+import { Archive, Network, Edit3, Check, X, Loader2 } from 'lucide-react';
 
 export default function Dashboard() {
 	const [searchTerm, setSearchTerm] = useState('');
@@ -23,7 +23,7 @@ export default function Dashboard() {
 
 	// React Query hooks
 	const { data: allContacts = [], isLoading: loadingContacts, error: contactsError } = useContacts();
-	const { mutate: syncData, isPending: syncing } = useSync();
+	const { mutate: syncData, isPending: syncing, isPollingJobs, runningJobs } = useSync();
 	const { data: syncStatus, isLoading: loadingSyncStatus } = useSyncStatus();
 	const { mutate: archiveContact, isPending: archiving } = useArchiveContact();
 	const { mutate: updateContact, isPending: updating } = useUpdateContact();
@@ -93,16 +93,20 @@ export default function Dashboard() {
 							</Button>
 							<Button 
 								onClick={handleSync} 
-								disabled={syncing || loadingSyncStatus || !syncStatus?.canSync} 
+								disabled={syncing || loadingSyncStatus || !syncStatus?.canSync || isPollingJobs} 
 								variant='default' 
 								size='sm'
 								title={
 									!syncStatus?.canSync && syncStatus?.minutesUntilNext 
 										? `You can sync again in ${syncStatus.minutesUntilNext} minute(s)`
+										: isPollingJobs
+										? `${runningJobs.length} sync job(s) are running in the background`
 										: undefined
 								}
 							>
+								{(syncing || isPollingJobs) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
 								{syncing ? 'Syncing...' : 
+								 isPollingJobs ? `Processing (${runningJobs.length})` :
 								 !syncStatus?.canSync && syncStatus?.minutesUntilNext ? 
 								 `Sync (${syncStatus.minutesUntilNext}m)` : 
 								 'Sync Data'}

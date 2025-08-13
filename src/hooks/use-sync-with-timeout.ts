@@ -1,9 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { contactsKeys } from './use-contacts';
 import { SyncResult, SyncResultSchema } from '@/lib/types';
 import { toast } from 'sonner';
-import { useJobStatus } from './use-job-status';
 
 async function syncData(): Promise<SyncResult> {
   const response = await fetch('/api/sync', {
@@ -31,26 +30,36 @@ async function syncData(): Promise<SyncResult> {
   return result.data;
 }
 
-export function useSync() {
+export function useSyncWithTimeout() {
   const queryClient = useQueryClient();
-  const [currentJobIds, setCurrentJobIds] = useState<string[]>([]);
-
-  // Poll job status when we have active jobs
-  const { allJobsCompleted, runningJobs } = useJobStatus(currentJobIds, currentJobIds.length > 0);
+  const [isWaitingForCompletion, setIsWaitingForCompletion] = useState(false);
 
   const mutation = useMutation({
     mutationFn: syncData,
     onSuccess: (data) => {
-      // Extract job IDs from the sync response
-      const jobIds = data.results?.triggers?.map(trigger => trigger.jobId) || [];
-      setCurrentJobIds(jobIds);
-
-      // Show success toast with job count
-      const jobCount = jobIds.length;
+      // Extract job count from the sync response
+      const jobCount = data.results?.triggers?.length || 0;
+      
       if (jobCount > 0) {
         toast.success(`Background sync started`, {
-          description: `${jobCount} sync job(s) are running in the background. You'll be notified when they complete.`
+          description: `${jobCount} sync job(s) are running in the background. Data will refresh automatically in a few minutes.`
         });
+
+        // Set waiting state and start timeout for auto-refresh
+        setIsWaitingForCompletion(true);
+        
+        // Refresh data after a reasonable delay (2-3 minutes for sync jobs to complete)
+        setTimeout(() => {
+          console.log('Auto-refreshing data after sync timeout');
+          queryClient.invalidateQueries({ queryKey: contactsKeys.all });
+          queryClient.invalidateQueries({ queryKey: ['networkGraph'] });
+          setIsWaitingForCompletion(false);
+          
+          toast.success('Data refreshed', {
+            description: 'Your contacts have been updated with the latest sync results.'
+          });
+        }, 2.5 * 60 * 1000); // 2.5 minutes
+        
       } else {
         toast.success('Sync completed');
       }
@@ -61,8 +70,8 @@ export function useSync() {
     onError: (error) => {
       console.error('Sync failed:', error);
       
-      // Clear job IDs on error
-      setCurrentJobIds([]);
+      // Clear waiting state on error
+      setIsWaitingForCompletion(false);
       
       // Handle rate limiting errors specially
       if (error instanceof Error && error.message.includes('Rate limited')) {
@@ -80,15 +89,8 @@ export function useSync() {
     },
   });
 
-  // Clear job IDs when all jobs are completed
-  if (allJobsCompleted && currentJobIds.length > 0) {
-    setCurrentJobIds([]);
-  }
-
   return {
     ...mutation,
-    currentJobIds,
-    runningJobs,
-    isPollingJobs: currentJobIds.length > 0 && !allJobsCompleted,
+    isWaitingForCompletion,
   };
 }
