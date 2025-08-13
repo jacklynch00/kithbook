@@ -100,13 +100,13 @@ export default function Dashboard() {
 									!syncStatus?.canSync && syncStatus?.minutesUntilNext 
 										? `You can sync again in ${syncStatus.minutesUntilNext} minute(s)`
 										: isPollingJobs
-										? `${runningJobs.length} sync job(s) are running in the background`
+										? `Sequential sync in progress: Calendar first, then Gmail automatically`
 										: undefined
 								}
 							>
 								{(syncing || isPollingJobs) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
 								{syncing ? 'Syncing...' : 
-								 isPollingJobs ? `Processing (${runningJobs.length})` :
+								 isPollingJobs ? `Processing...` :
 								 !syncStatus?.canSync && syncStatus?.minutesUntilNext ? 
 								 `Sync (${syncStatus.minutesUntilNext}m)` : 
 								 'Sync Data'}

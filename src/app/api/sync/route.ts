@@ -46,38 +46,32 @@ export async function POST(request: NextRequest) {
     const triggers = [];
     const errors = [];
 
-    // Trigger Gmail sync job
+    // Step 1: Trigger Calendar sync job first (to create contacts from meeting attendees)
     try {
-      const gmailHandle = await tasks.trigger("manual-gmail-sync", { userId: session.user.id });
-      triggers.push({
-        service: 'Gmail',
-        jobId: gmailHandle.id,
+      const calendarHandle = await tasks.trigger("manual-calendar-sync", { 
+        userId: session.user.id,
+        triggerGmailAfter: true // Flag to trigger Gmail sync after completion
       });
-      console.log(`Gmail sync job triggered: ${gmailHandle.id}`);
-    } catch (gmailError) {
-      console.error('Failed to trigger Gmail sync:', gmailError);
-      errors.push(`Failed to trigger Gmail sync: ${gmailError instanceof Error ? gmailError.message : 'Unknown error'}`);
-    }
-
-    // Trigger Calendar sync job  
-    try {
-      const calendarHandle = await tasks.trigger("manual-calendar-sync", { userId: session.user.id });
       triggers.push({
         service: 'Calendar',
         jobId: calendarHandle.id,
       });
-      console.log(`Calendar sync job triggered: ${calendarHandle.id}`);
+      console.log(`Calendar sync job triggered: ${calendarHandle.id} (Gmail will follow)`);
     } catch (calendarError) {
       console.error('Failed to trigger Calendar sync:', calendarError);
       errors.push(`Failed to trigger Calendar sync: ${calendarError instanceof Error ? calendarError.message : 'Unknown error'}`);
     }
+
+    // Note: Gmail sync will be triggered automatically by the calendar sync job when it completes
 
     return NextResponse.json({
       success: true,
       results: {
         triggers,
         errors,
-        message: `Triggered ${triggers.length} sync job(s). Jobs are running in the background.`
+        message: triggers.length > 0 
+          ? `Started sequential sync: Calendar first, then Gmail. Jobs are running in the background.`
+          : `No sync jobs were triggered due to errors.`
       },
     });
 

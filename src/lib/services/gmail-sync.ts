@@ -7,6 +7,23 @@ export async function syncGmailForUser(userId: string) {
   try {
     console.log(`Starting Gmail sync for user ${userId}`);
     
+    // Get existing contacts (created from calendar events)
+    const existingContacts = await prisma.contact.findMany({
+      where: { 
+        userId,
+        archived: false 
+      },
+      select: { email: true }
+    });
+    
+    const contactEmails = new Set(existingContacts.map(contact => contact.email.toLowerCase()));
+    console.log(`Found ${contactEmails.size} existing contacts to sync emails for`);
+    
+    if (contactEmails.size === 0) {
+      console.log('No existing contacts found - skipping Gmail sync');
+      return { syncedCount: 0, totalFound: 0 };
+    }
+    
     const auth = await createGoogleClient(userId);
     const gmail = google.gmail({ version: 'v1', auth });
 
@@ -61,6 +78,30 @@ export async function syncGmailForUser(userId: string) {
         const fromName = fromMatch?.[1]?.trim().replace(/^"(.*)"$/, '$1') || null;
         const fromEmail = fromMatch?.[2]?.trim() || fromMatch?.[1]?.trim() || null;
 
+        // Check if sender or any recipients are existing contacts
+        const isFromContact = fromEmail && contactEmails.has(fromEmail.toLowerCase());
+        
+        // Parse recipients to check if any are contacts
+        const recipientEmails: string[] = [];
+        if (toHeader) {
+          const recipients = toHeader.split(',').map(r => r.trim());
+          for (const recipient of recipients) {
+            const recipientMatch = recipient.match(/^(.*?)\s*<(.+)>$/) || recipient.match(/^(.+)$/);
+            const recipientEmail = recipientMatch?.[2]?.trim() || recipientMatch?.[1]?.trim();
+            if (recipientEmail) {
+              recipientEmails.push(recipientEmail.toLowerCase());
+            }
+          }
+        }
+        
+        const hasContactRecipient = recipientEmails.some(email => contactEmails.has(email));
+        
+        // Only process email if sender or recipient is an existing contact
+        if (!isFromContact && !hasContactRecipient) {
+          console.log(`Skipping email ${message.id} - no contacts involved (from: ${fromEmail})`);
+          continue;
+        }
+
         // Get email body/snippet
         let body = messageData.snippet || '';
         
@@ -98,23 +139,25 @@ export async function syncGmailForUser(userId: string) {
           },
         });
 
-        // Create/update contact from sender
-        if (fromEmail && fromEmail !== 'me') {
+        // Update interaction counts for existing contacts only (don't create new contacts)
+        if (fromEmail && fromEmail !== 'me' && contactEmails.has(fromEmail.toLowerCase())) {
           const senderName = fromName || extractNameFromEmail(fromHeader || '');
           await createOrUpdateContact(userId, fromEmail, senderName, receivedAt);
         }
 
-        // Create/update contacts from recipients (To header)
-        if (toHeader) {
-          const recipients = toHeader.split(',').map(r => r.trim());
-          for (const recipient of recipients) {
-            const recipientMatch = recipient.match(/^(.*?)\s*<(.+)>$/) || recipient.match(/^(.+)$/);
-            const recipientName = recipientMatch?.[1]?.trim().replace(/^"(.*)"$/, '$1') || null;
-            const recipientEmail = recipientMatch?.[2]?.trim() || recipientMatch?.[1]?.trim();
+        // Update interaction counts for recipient contacts (only existing ones)
+        for (const recipientEmail of recipientEmails) {
+          if (contactEmails.has(recipientEmail)) {
+            const originalRecipient = toHeader?.split(',').find(r => {
+              const match = r.match(/^(.*?)\s*<(.+)>$/) || r.match(/^(.+)$/);
+              const email = match?.[2]?.trim() || match?.[1]?.trim();
+              return email?.toLowerCase() === recipientEmail;
+            });
             
-            if (recipientEmail && recipientEmail !== 'me') {
-              const name = recipientName || extractNameFromEmail(recipient);
-              await createOrUpdateContact(userId, recipientEmail, name, receivedAt);
+            if (originalRecipient) {
+              const recipientMatch = originalRecipient.match(/^(.*?)\s*<(.+)>$/) || originalRecipient.match(/^(.+)$/);
+              const recipientName = recipientMatch?.[1]?.trim().replace(/^"(.*)"$/, '$1') || null;
+              await createOrUpdateContact(userId, recipientEmail, recipientName, receivedAt);
             }
           }
         }

@@ -50,7 +50,8 @@ export function useJobStatus(jobIds: string[], enabled: boolean = true) {
         job.status === 'UNKNOWN'
       );
       
-      return allJobsFinished ? false : 3000; // Poll every 3 seconds
+      // For sequential sync, poll for longer to catch the Gmail job
+      return allJobsFinished ? false : 4000; // Poll every 4 seconds (slightly longer for sequential jobs)
     },
     staleTime: 0, // Always consider stale so it refetches
   });
@@ -69,21 +70,35 @@ export function useJobStatus(jobIds: string[], enabled: boolean = true) {
 
     // Check if any jobs just completed
     if (completedJobs.length > 0) {
-      // Invalidate contacts and network data to refresh
-      queryClient.invalidateQueries({ queryKey: contactsKeys.all });
-      queryClient.invalidateQueries({ queryKey: ['networkGraph'] });
-      
-      // Show success notification
-      toast.success('Sync completed', {
-        description: `${completedJobs.length} sync job(s) finished successfully. Your data has been updated.`
-      });
+      // For sequential sync, we want to check if this is a complete sync cycle
+      const allJobsFinished = query.data.jobs.every(job => 
+        job.status === 'COMPLETED' || 
+        job.status === 'FAILED' || 
+        job.status === 'CANCELLED' ||
+        job.status === 'UNKNOWN'
+      );
+
+      // Only refresh data and show completion when ALL jobs are done
+      if (allJobsFinished) {
+        // Invalidate contacts and network data to refresh
+        queryClient.invalidateQueries({ queryKey: contactsKeys.all });
+        queryClient.invalidateQueries({ queryKey: ['networkGraph'] });
+        
+        // Show success notification
+        const successfulJobs = query.data.jobs.filter(job => job.status === 'COMPLETED').length;
+        const totalJobs = query.data.jobs.length;
+        
+        if (successfulJobs === totalJobs) {
+          toast.success('Sync completed');
+        } else {
+          toast.success('Sync partially completed');
+        }
+      }
     }
 
-    // Handle failed jobs
+    // Handle failed jobs immediately (don't wait for all to complete)
     if (failedJobs.length > 0) {
-      toast.error('Some sync jobs failed', {
-        description: `${failedJobs.length} sync job(s) encountered errors. Please try syncing again.`
-      });
+      toast.error('Sync failed');
     }
   }, [query.data, queryClient]);
 

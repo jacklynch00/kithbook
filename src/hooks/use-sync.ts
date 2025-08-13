@@ -48,9 +48,7 @@ export function useSync() {
       // Show success toast with job count
       const jobCount = jobIds.length;
       if (jobCount > 0) {
-        toast.success(`Background sync started`, {
-          description: `${jobCount} sync job(s) are running in the background. You'll be notified when they complete.`
-        });
+        toast.success('Syncing data');
       } else {
         toast.success('Sync completed');
       }
