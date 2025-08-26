@@ -31,10 +31,10 @@ export async function getNetworkGraphData(userId: string): Promise<NetworkGraphD
   });
 
   // Create a map for quick contact lookup
-  const contactMap = new Map(contacts.map(c => [c.email.toLowerCase(), c]));
+  const contactMap = new Map(contacts.map((c: any) => [c.email.toLowerCase(), c]));
 
   // Initialize nodes
-  const nodes: NetworkNode[] = contacts.map(contact => ({
+  const nodes: NetworkNode[] = contacts.map((contact: any) => ({
     id: contact.email,
     label: contact.name || contact.email.split('@')[0],
     email: contact.email,

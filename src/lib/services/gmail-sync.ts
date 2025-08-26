@@ -7,7 +7,7 @@ export async function syncGmailForUser(userId: string) {
   try {
     console.log(`Starting Gmail sync for user ${userId}`);
     
-    // Get existing contacts (created from calendar events)
+    // Get existing contacts to sync emails for
     const existingContacts = await prisma.contact.findMany({
       where: { 
         userId,
@@ -16,10 +16,10 @@ export async function syncGmailForUser(userId: string) {
       select: { email: true }
     });
     
-    const contactEmails = new Set(existingContacts.map(contact => contact.email.toLowerCase()));
-    console.log(`Found ${contactEmails.size} existing contacts to sync emails for`);
+    const contactEmails = existingContacts.map((contact: {email: string}) => contact.email.toLowerCase());
+    console.log(`Found ${contactEmails.length} existing contacts to sync emails for`);
     
-    if (contactEmails.size === 0) {
+    if (contactEmails.length === 0) {
       console.log('No existing contacts found - skipping Gmail sync');
       return { syncedCount: 0, totalFound: 0 };
     }
@@ -27,24 +27,60 @@ export async function syncGmailForUser(userId: string) {
     const auth = await createGoogleClient(userId);
     const gmail = google.gmail({ version: 'v1', auth });
 
-    // Calculate date 30 days ago
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const query = `after:${Math.floor(thirtyDaysAgo.getTime() / 1000)}`;
+    // Search for emails involving specific contacts
+    let allMessages: any[] = [];
+    const batchSize = 10; // Process contacts in batches to avoid overly complex queries
+    
+    for (let i = 0; i < contactEmails.length; i += batchSize) {
+      const batch = contactEmails.slice(i, i + batchSize);
+      
+      // Create search query for this batch of contacts
+      const fromQueries = batch.map((email: string) => `from:${email}`).join(' OR ');
+      const toQueries = batch.map((email: string) => `to:${email}`).join(' OR ');
+      const query = `(${fromQueries}) OR (${toQueries})`;
+      
+      console.log(`Searching emails for contacts ${i + 1}-${Math.min(i + batchSize, contactEmails.length)} of ${contactEmails.length}`);
+      
+      // Fetch messages for this batch with pagination
+      let pageToken: string | undefined;
+      
+      do {
+        const listResponse = await gmail.users.messages.list({
+          userId: 'me',
+          q: query,
+          maxResults: 500, // Gmail API max
+          pageToken,
+        });
+        
+        const messages = listResponse.data.messages || [];
+        
+        // Avoid duplicates by checking message IDs
+        const newMessages = messages.filter((msg: any) => 
+          !allMessages.some((existing: any) => existing.id === msg.id)
+        );
+        
+        allMessages.push(...newMessages);
+        pageToken = listResponse.data.nextPageToken || undefined;
+        
+        console.log(`  Fetched ${messages.length} messages (${newMessages.length} new, total: ${allMessages.length})`);
+        
+        // Safety limit
+        if (allMessages.length >= 10000) {
+          console.log(`Reached message limit of 10,000 for user ${userId}`);
+          pageToken = undefined; // Break out of pagination
+          break;
+        }
+      } while (pageToken);
+      
+      // Add small delay between batches to be nice to the API
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
 
-    // Get list of messages from past 30 days
-    const listResponse = await gmail.users.messages.list({
-      userId: 'me',
-      q: query,
-      maxResults: 100, // Adjust as needed
-    });
-
-    const messages = listResponse.data.messages || [];
-    console.log(`Found ${messages.length} messages for user ${userId}`);
+    console.log(`Found ${allMessages.length} total messages for ${contactEmails.length} contacts`);
 
     let syncedCount = 0;
     
-    for (const message of messages) {
+    for (const message of allMessages) {
       if (!message.id) continue;
 
       // Check if we already have this email
@@ -78,10 +114,7 @@ export async function syncGmailForUser(userId: string) {
         const fromName = fromMatch?.[1]?.trim().replace(/^"(.*)"$/, '$1') || null;
         const fromEmail = fromMatch?.[2]?.trim() || fromMatch?.[1]?.trim() || null;
 
-        // Check if sender or any recipients are existing contacts
-        const isFromContact = fromEmail && contactEmails.has(fromEmail.toLowerCase());
-        
-        // Parse recipients to check if any are contacts
+        // Parse recipients
         const recipientEmails: string[] = [];
         if (toHeader) {
           const recipients = toHeader.split(',').map(r => r.trim());
@@ -92,14 +125,6 @@ export async function syncGmailForUser(userId: string) {
               recipientEmails.push(recipientEmail.toLowerCase());
             }
           }
-        }
-        
-        const hasContactRecipient = recipientEmails.some(email => contactEmails.has(email));
-        
-        // Only process email if sender or recipient is an existing contact
-        if (!isFromContact && !hasContactRecipient) {
-          console.log(`Skipping email ${message.id} - no contacts involved (from: ${fromEmail})`);
-          continue;
         }
 
         // Get email body/snippet
@@ -139,15 +164,15 @@ export async function syncGmailForUser(userId: string) {
           },
         });
 
-        // Update interaction counts for existing contacts only (don't create new contacts)
-        if (fromEmail && fromEmail !== 'me' && contactEmails.has(fromEmail.toLowerCase())) {
+        // Update contact for sender (if they are in our contact list and not user themselves)
+        if (fromEmail && fromEmail !== 'me' && contactEmails.includes(fromEmail.toLowerCase())) {
           const senderName = fromName || extractNameFromEmail(fromHeader || '');
           await createOrUpdateContact(userId, fromEmail, senderName, receivedAt);
         }
 
-        // Update interaction counts for recipient contacts (only existing ones)
+        // Update contacts for recipients (if they are in our contact list)
         for (const recipientEmail of recipientEmails) {
-          if (contactEmails.has(recipientEmail)) {
+          if (contactEmails.includes(recipientEmail)) {
             const originalRecipient = toHeader?.split(',').find(r => {
               const match = r.match(/^(.*?)\s*<(.+)>$/) || r.match(/^(.+)$/);
               const email = match?.[2]?.trim() || match?.[1]?.trim();
@@ -169,7 +194,7 @@ export async function syncGmailForUser(userId: string) {
     }
 
     console.log(`Gmail sync completed for user ${userId}. Synced ${syncedCount} new emails.`);
-    return { syncedCount, totalFound: messages.length };
+    return { syncedCount, totalFound: allMessages.length };
     
   } catch (error) {
     console.error(`Gmail sync failed for user ${userId}:`, error);

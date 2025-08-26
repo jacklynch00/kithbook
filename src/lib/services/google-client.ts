@@ -2,6 +2,15 @@ import { google } from 'googleapis';
 import { prisma } from '@/lib/prisma';
 
 export async function createGoogleClient(userId: string) {
+  // Validate environment variables first
+  if (!process.env.GOOGLE_CLIENT_ID) {
+    throw new Error('GOOGLE_CLIENT_ID environment variable is not set');
+  }
+  
+  if (!process.env.GOOGLE_CLIENT_SECRET) {
+    throw new Error('GOOGLE_CLIENT_SECRET environment variable is not set');
+  }
+
   // Get the user's Google account with tokens
   const account = await prisma.account.findFirst({
     where: {
@@ -10,12 +19,13 @@ export async function createGoogleClient(userId: string) {
     },
   });
 
-  if (!account || !account.accessToken) {
+  if (!account) {
     throw new Error(`No Google account found for user ${userId}`);
   }
 
-  if (!account.refreshToken) {
-    throw new Error(`No refresh token found for user ${userId}. Please re-authenticate with Google to grant offline access.`);
+  // Check if tokens were cleared due to previous auth failures
+  if (!account.accessToken || !account.refreshToken) {
+    throw new Error(`Google account tokens are invalid for user ${userId}. User needs to re-authenticate.`);
   }
 
   // Create OAuth2 client
@@ -48,7 +58,19 @@ export async function createGoogleClient(userId: string) {
       oauth2Client.setCredentials(credentials);
     } catch (error) {
       console.error('Failed to refresh token for user', userId, error);
-      throw new Error(`Failed to refresh Google token for user ${userId}`);
+      
+      // Mark account as having invalid tokens
+      await prisma.account.update({
+        where: { id: account.id },
+        data: {
+          // Clear tokens to indicate they're invalid
+          accessToken: null,
+          refreshToken: null,
+          accessTokenExpiresAt: null,
+        },
+      });
+
+      throw new Error(`Failed to refresh Google token for user ${userId}. User needs to re-authenticate.`);
     }
   }
 

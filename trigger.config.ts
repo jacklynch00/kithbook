@@ -9,6 +9,8 @@ export default defineConfig({
 	// You can override this on an individual task.
 	// See https://trigger.dev/docs/runs/max-duration
 	maxDuration: 3600,
+	// Use small machine since we've optimized memory usage
+	machine: 'small-2x', // Options: small-1x, medium-1x, large-1x, xlarge-1x
 	retries: {
 		enabledInDev: true,
 		default: {

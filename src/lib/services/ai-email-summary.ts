@@ -148,7 +148,7 @@ export async function generateContactEmailSummary(
     }
 
     // Prepare email content for AI analysis
-    const emailContent = emails.map((email, index) => {
+    const emailContent = emails.map((email: any, index: number) => {
       const direction = email.fromEmail?.toLowerCase() === contactEmail.toLowerCase() ? 'FROM' : 'TO';
       const subject = email.subject || 'No subject';
       const body = email.body ? email.body.substring(0, 500) : 'No content'; // Limit body length
@@ -259,7 +259,7 @@ export async function generateQuickEmailSummary(
       return "No recent email history with this contact.";
     }
 
-    const emailSummaries = recentEmails.map(email => {
+    const emailSummaries = recentEmails.map((email: any) => {
       const direction = email.fromEmail?.toLowerCase() === contactEmail.toLowerCase() ? 'received' : 'sent';
       const subject = email.subject || 'No subject';
       return `${direction}: ${subject}`;
